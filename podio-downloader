@@ -1,0 +1,32 @@
+#!/bin/bash
+touch downloaded.log
+wget -q "http://www.podiobooks.com/opml/listeninglist/guodman/list.opml" --output-document=listeninglist.php
+booklist=`cat listeninglist.php | grep --only-matching "htmlUrl=\"[^\"]*" | sed 's/^htmlUrl=\"//'`
+for book in $booklist
+do
+    downloaded=`grep $book downloaded.log`
+    if [ "$downloaded" == "" ]
+    then
+	wget -q $book --output-document=book.html
+	completed=`grep "This podiobook is <span style='color: blue; font-weight: bold'>complete</span>" --only-matching book.html`
+	title=`grep "<title>.* - A free" --only-matching book.html | sed 's/^<title>//' | sed 's/ - A free$//'`
+	author=`grep "<span class=\"subtitle\">  by .*</span>" --only-matching book.html | sed 's/<span class=\"subtitle\">  by //' | sed 's/<\/span>//'`
+	if [ "$completed" == "" ]
+	then
+	    echo "Waiting for completion of $title by $author"
+	else
+	    echo "Downloading $title by $author"
+	    episodes=`grep "http://www.podiobooks.com/sample/[^\.]*\.mp3" --only-matching book.html`
+	    mkdir "$author - $title"
+	    for e in $episodes
+	    do
+		wget -q $e --output-document="$author - $title/`basename $e`"
+		echo `basename $e` >> "$author - $title/$author - $title.m3u"
+		sleep 5
+	    done
+	    echo $book >> downloaded.log
+	fi
+	rm book.html
+    fi
+done
+rm listeninglist.php
